@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tool output / generated maps (never commit scan results)
+out/
+*.png
+*.svg
+*.dot
+evidence/
+
+# Your own target lists & refinements (keep these out of the public repo)
+domains.txt
+labels.*.txt
+!labels.example.txt
+
+# Editor / OS / local agent config
+.DS_Store
+.idea/
+.vscode/
+.claude/

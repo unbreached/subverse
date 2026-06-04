@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "subverse"
+version = "0.1.0"
+description = "Full DNS + service probe of a domain list, visualized as an attack-surface graph."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["dnspython>=2.4"]
+
+[project.scripts]
+subverse = "subverse.cli:main"
+
+[tool.setuptools]
+packages = ["subverse"]

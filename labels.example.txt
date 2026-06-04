@@ -1,0 +1,8 @@
+# Refinement overrides — one per line:  ip | role | footnote
+# Role tags and footnotes are auto-derived; this file lets you override them
+# per-IP after a first run. A blank role or footnote keeps the auto value.
+#
+# 203.0.113.10  | Reverse-proxy hub | Fronts most of the public web estate.
+# 203.0.113.20  | Mail host         |
+# 198.51.100.5  | Standalone        | Legacy box — confirm still needed.
+# 192.0.2.7     | Info leak         | Private/internal IP exposed in public DNS.

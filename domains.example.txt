@@ -1,0 +1,10 @@
+# Subverse input — one (sub)domain per line.
+#   * '#' starts a comment, blank lines ignored, duplicates dropped.
+#   * An optional note may follow the host (whitespace-separated); it is shown
+#     in tooltips — handy for carrying status across from a report.
+#
+# example.com
+# www.example.com
+# api.example.com        prod API
+# old-blog.example.com   decommissioned?
+# vpn.example.com
