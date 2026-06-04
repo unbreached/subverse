@@ -88,7 +88,8 @@ python -m subverse domains.txt \
     --json --open
 
 python -m subverse domains.txt --no-scan                 # skip nmap (faster, DNS + HTTP only)
-python -m subverse domains.txt --graph                   # also emit the node-graph view
+python -m subverse domains.txt --plotter                 # also emit the interactive drag-around graph
+python -m subverse domains.txt --graph                   # also emit the static Graphviz node image
 python -m subverse domains.txt --ports 80,443,8080,8443  # custom port set
 python -m subverse domains.txt --intensity aggressive    # nmap --version-all + banners
 ```
@@ -130,7 +131,8 @@ python -m subverse domains.txt --labels labels.example.txt
 | `<name>.html`     | the card-grid map (open in a browser) |
 | `<name>.png`      | the card map rasterized — report evidence |
 | `<name>.json`     | raw scan data (with `--json`) |
-| `<name>-graph.*`  | node-graph HTML/PNG/SVG/DOT (with `--graph`) |
+| `<name>-plotter.html` | **interactive analysis graph** — drag/zoom/hover, filter node types, "risk only" toggle (with `--plotter`) |
+| `<name>-graph.*`  | static node-graph image PNG/SVG/DOT (with `--graph`) |
 
 ## How the card map reads
 
@@ -157,7 +159,7 @@ subverse/
   probe.py            orchestrator (resolve → asn → http → nmap → posture → classify)
   graph.py            ScanResult → abstract node/edge graph (for --graph)
   render_cards.py     card-grid map → HTML + PNG (default)
-  render_html.py      interactive vis-network graph (--graph)
+  render_html.py      interactive vis-network analysis graph (--plotter)
   render_graphviz.py  static DOT → PNG/SVG (--graph)
   platform_utils.py   cross-platform browser discovery / screenshot / open
   bootstrap.py        dependency check + auto-install

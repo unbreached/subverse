@@ -196,11 +196,18 @@ _TEMPLATE = """<!DOCTYPE html>
     border:1px solid currentColor; }}
   .foot {{ font-size:10px; color:var(--dim); margin-top:18px; line-height:1.5; }}
   .shape-note {{ color:var(--dim); font-size:10px; }}
+  .inspect {{ font-size:11px; color:var(--dim); line-height:1.5; word-break:break-word; }}
+  .ins-title {{ color:var(--text); font-weight:700; margin-bottom:6px; word-break:break-all; }}
+  .ins-body {{ white-space:pre-wrap; margin:0 0 8px; color:var(--text);
+    font-family:inherit; font-size:11px; }}
+  .ins-conn {{ white-space:pre-wrap; color:var(--dim);
+    border-top:1px solid var(--grid); padding-top:6px; }}
+  .ins-conn b {{ color:var(--teal); }}
 </style>
 </head>
 <body>
   <div id="bar">
-    <div class="brand">TP<span>C</span></div>
+    <div class="brand">SUB<span>VERSE</span></div>
     <div>
       <div class="title">{title}</div>
       <div class="meta">{org} &nbsp; {ref} &nbsp; {ts}</div>
@@ -219,6 +226,8 @@ _TEMPLATE = """<!DOCTYPE html>
     <div id="side">
       <h3>Search</h3>
       <input id="search" placeholder="filter by name..." />
+      <h3>Inspector</h3>
+      <div id="inspect" class="inspect">Click any node for its DNS records, ports, banners &amp; connections.</div>
       <h3>Show node types</h3>
       <label class="row"><input type="checkbox" data-kind="zone" checked> Root domains</label>
       <label class="row"><input type="checkbox" data-kind="host" checked> Subdomains</label>
@@ -290,6 +299,26 @@ _TEMPLATE = """<!DOCTYPE html>
   document.getElementById('riskonly').addEventListener('change', e => {{ riskOnly=e.target.checked; apply(); }});
   document.getElementById('search').addEventListener('input', e => {{ term=e.target.value.toLowerCase(); apply(); }});
   network.once('stabilizationIterationsDone', () => network.setOptions({{physics:false}}));
+
+  // --- click-to-inspect: pin a node's full detail + what it connects to ---
+  const NODE_BY_ID = {{}};
+  RAW_NODES.forEach(n => {{ NODE_BY_ID[n.id] = n; }});
+  const inspectEl = document.getElementById('inspect');
+  const INSPECT_HINT = 'Click any node for its DNS records, ports, banners & connections.';
+  function esc(s) {{ return String(s).replace(/[&<>]/g, c => ({{'&':'&amp;','<':'&lt;','>':'&gt;'}}[c])); }}
+  function showInspect(id) {{
+    const n = NODE_BY_ID[id];
+    if (!n) {{ return; }}
+    const conn = network.getConnectedNodes(id)
+      .map(cid => (NODE_BY_ID[cid] || {{}}).label || cid)
+      .map(l => String(l).replace(/\\n/g, '  '));
+    let h = '<div class="ins-title">' + esc(String(n.label).replace(/\\n/g, '  ')) + '</div>';
+    if (n.title) {{ h += '<pre class="ins-body">' + esc(n.title) + '</pre>'; }}
+    if (conn.length) {{ h += '<div class="ins-conn"><b>Connected (' + conn.length + ')</b>\\n' + esc(conn.join('\\n')) + '</div>'; }}
+    inspectEl.innerHTML = h;
+  }}
+  network.on('selectNode', p => showInspect(p.nodes[0]));
+  network.on('deselectNode', () => {{ inspectEl.textContent = INSPECT_HINT; }});
 </script>
 </body>
 </html>

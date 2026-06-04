@@ -49,11 +49,16 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Skip the DNS/email posture (SPF/DKIM/DMARC/CAA) checks.")
     p.add_argument("--intensity", choices=["light", "normal", "aggressive"],
                    default="light", help="nmap -sV intensity.")
+    p.add_argument("--plotter", action="store_true",
+                   help="Also emit the interactive 'plotter' view: a draggable, "
+                        "zoomable HTML graph (vis-network) of domains -> IPs -> "
+                        "providers, with hover details and a 'risk only' toggle. "
+                        "Needs no extra tools (vis-network loads from a CDN).")
     p.add_argument("--graph", action="store_true",
-                   help="Also emit the node-graph view (HTML + PNG/SVG) "
-                        "alongside the default card map.")
+                   help="Also emit the static node-graph image (PNG/SVG/DOT) via "
+                        "Graphviz, alongside the default card map.")
     p.add_argument("--no-cards", action="store_true",
-                   help="Skip the card map (e.g. when you only want --graph).")
+                   help="Skip the card map (e.g. when you only want --plotter/--graph).")
     p.add_argument("--subtitle", default=None, help="Subtitle under the map title.")
     p.add_argument("--labels", default=None,
                    help="Sidecar file (ip|role|footnote per line) to refine the "
@@ -62,8 +67,6 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Comma-separated DNS resolvers to use (default: system).")
     p.add_argument("--timeout", type=float, default=4.0, help="DNS query timeout (s).")
     p.add_argument("--workers", type=int, default=24, help="Concurrent DNS workers.")
-    p.add_argument("--no-html", action="store_true", help="Don't write interactive HTML.")
-    p.add_argument("--no-image", action="store_true", help="Don't render PNG/SVG.")
     p.add_argument("--json", action="store_true", help="Also write raw results as JSON.")
     p.add_argument("--dpi", type=int, default=160, help="PNG resolution.")
     p.add_argument("--title", default=None, help="Title shown on the visualizations.")
@@ -204,19 +207,19 @@ def main(argv: list[str] | None = None) -> int:
         if "error" in result:
             print(f"[!] {result['error']}", file=sys.stderr)
 
-    # --- optional: the node-graph view -------------------------------------
-    if args.graph:
+    # --- optional: interactive "plotter" view (drag/zoom) and/or the -------
+    # --- static Graphviz node-graph image ----------------------------------
+    if args.plotter or args.graph:
         from .graph import build_graph
-        from .render_html import render_html
-        from .render_graphviz import render_images
         g = build_graph(scan)
-        graph_base = out_dir / f"{base}-graph"
-        if not args.no_html:
-            gp = graph_base.with_suffix(".html")
-            gp.write_text(render_html(g, meta), encoding="utf-8")
-            produced.append(str(gp))
-        if not args.no_image:
-            gres = render_images(g, meta, graph_base, dpi=args.dpi)
+        if args.plotter:
+            from .render_html import render_html
+            plot_path = (out_dir / f"{base}-plotter").with_suffix(".html")
+            plot_path.write_text(render_html(g, meta), encoding="utf-8")
+            produced.append(str(plot_path))
+        if args.graph:
+            from .render_graphviz import render_images
+            gres = render_images(g, meta, out_dir / f"{base}-graph", dpi=args.dpi)
             for key in ("png", "svg", "dot"):
                 if key in gres:
                     produced.append(gres[key])
