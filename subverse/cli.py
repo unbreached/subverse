@@ -36,6 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("domains", nargs="?",
                    help="Path to a text file: one (sub)domain per line "
                         "('#' comments and trailing notes allowed).")
+    p.add_argument("--crtsh", default=None, metavar="DOMAIN[,DOMAIN...]",
+                   help="Enumerate (sub)domains from crt.sh Certificate "
+                        "Transparency logs for the given apex domain(s) and add "
+                        "them to the scan. Works with or without a domains file; "
+                        "comma-separate multiple apexes.")
     p.add_argument("-o", "--output-dir", default="out", help="Where to write outputs.")
     p.add_argument("-n", "--name", default=None,
                    help="Base filename for outputs (default: derived from input).")
@@ -66,6 +71,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--resolver", default=None,
                    help="Comma-separated DNS resolvers to use (default: system).")
     p.add_argument("--timeout", type=float, default=4.0, help="DNS query timeout (s).")
+    p.add_argument("--http-timeout", type=float, default=6.0,
+                   help="HTTP/TLS probe timeout per host (s).")
     p.add_argument("--workers", type=int, default=24, help="Concurrent DNS workers.")
     p.add_argument("--json", action="store_true", help="Also write raw results as JSON.")
     p.add_argument("--dpi", type=int, default=160, help="PNG resolution.")
@@ -112,19 +119,42 @@ def main(argv: list[str] | None = None) -> int:
     from .probe import read_domains, run_probe
     from .render_cards import render_cards_image
 
-    if not args.domains:
-        print("error: no domains file given. Pass a file, or use --check-deps / "
-              "--install-deps.", file=sys.stderr)
+    if not args.domains and not args.crtsh:
+        print("error: give a domains file and/or --crtsh DOMAIN. "
+              "Use --check-deps / --install-deps to just inspect tooling.",
+              file=sys.stderr)
         return 2
 
-    in_path = Path(args.domains)
-    if not in_path.exists():
-        print(f"error: domains file not found: {in_path}", file=sys.stderr)
-        return 2
+    # --- assemble the target list from an optional file and/or crt.sh ---------
+    domains: list[tuple[str, str]] = []
+    in_path = None
+    if args.domains:
+        in_path = Path(args.domains)
+        if not in_path.exists():
+            print(f"error: domains file not found: {in_path}", file=sys.stderr)
+            return 2
+        domains = read_domains(str(in_path))
 
-    domains = read_domains(str(in_path))
+    if args.crtsh:
+        from .crtsh import fetch_subdomains, merge_targets, CrtShError
+        for apex in [d.strip() for d in args.crtsh.split(",") if d.strip()]:
+            if not args.quiet:
+                print(f"[*] Querying crt.sh for {apex} ...",
+                      file=sys.stderr, flush=True)
+            try:
+                names = fetch_subdomains(apex)
+            except CrtShError as exc:
+                print(f"[!] crt.sh: {exc}", file=sys.stderr)
+                continue
+            if not args.quiet:
+                print(f"[*] crt.sh returned {len(names)} name(s) for {apex}.",
+                      file=sys.stderr)
+            domains = merge_targets(domains, [(n, "") for n in names])
+
     if not domains:
-        print(f"error: no domains found in {in_path}", file=sys.stderr)
+        where = str(in_path) if in_path else "crt.sh"
+        print(f"error: no domains to scan (nothing from {where}).",
+              file=sys.stderr)
         return 2
 
     # warn (don't fail) about missing optional tools relevant to this run
@@ -150,6 +180,7 @@ def main(argv: list[str] | None = None) -> int:
         do_http=not args.no_http,
         do_posture=not args.no_posture,
         timeout=args.timeout,
+        http_timeout=args.http_timeout,
         workers=args.workers,
         quiet=args.quiet,
     )
@@ -174,11 +205,15 @@ def main(argv: list[str] | None = None) -> int:
     providers = sorted({ip.provider for ip in scan.ips.values() if ip.provider})
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
+    # a fallback name for output/title when no file was given (crt.sh-only run)
+    first_crtsh = args.crtsh.split(",")[0].strip() if args.crtsh else ""
+    fallback_name = (in_path.stem if in_path else first_crtsh) or "subverse"
+
     # primary zone = the most-represented zone, used for a sensible default title
     zone_counts: dict[str, int] = {}
     for h in scan.hosts:
         zone_counts[h.zone] = zone_counts.get(h.zone, 0) + 1
-    primary_zone = max(zone_counts, key=zone_counts.get) if zone_counts else in_path.stem
+    primary_zone = max(zone_counts, key=zone_counts.get) if zone_counts else fallback_name
 
     title = args.title or f"{primary_zone} — external attack surface map"
     meta = {
@@ -193,7 +228,7 @@ def main(argv: list[str] | None = None) -> int:
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    base = args.name or in_path.stem
+    base = args.name or fallback_name
     out_base = out_dir / base
 
     produced: list[str] = []

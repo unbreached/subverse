@@ -92,6 +92,7 @@ python -m subverse domains.txt --plotter                 # also emit the interac
 python -m subverse domains.txt --graph                   # also emit the static Graphviz node image
 python -m subverse domains.txt --ports 80,443,8080,8443  # custom port set
 python -m subverse domains.txt --intensity aggressive    # nmap --version-all + banners
+python -m subverse domains.txt --http-timeout 10         # slower HTTP/TLS probe timeout
 ```
 
 > **Tip:** the included `.gitignore` keeps `domains.txt` and your `labels.*.txt`
@@ -107,6 +108,23 @@ www.example.com
 api.example.com      prod API
 old.example.com      decommissioned?
 ```
+
+### Enumerating targets from crt.sh (`--crtsh`)
+
+Instead of (or alongside) a file, pull the target list straight from
+[crt.sh](https://crt.sh) Certificate Transparency logs. Because CT logs include
+**expired** certificates, this surfaces forgotten and decommissioned subdomains
+that still resolve — exactly the stale attack surface the map is built to show.
+
+```bash
+python -m subverse --crtsh example.com -o out              # scan what crt.sh finds
+python -m subverse --crtsh example.com,acme.com -o out     # several apexes at once
+python -m subverse domains.txt --crtsh example.com -o out  # merge a file + crt.sh, deduped
+```
+
+It needs no API key and no extra tools. crt.sh only sees names that appeared in
+a public certificate, so treat it as one source, not the whole picture. The
+service is often overloaded and may return a transient error; just re-run.
 
 ### Refining the map (`--labels`)
 
@@ -151,6 +169,7 @@ subverse/
   model.py            dataclasses (the shared scan record)
   resolver.py         DNS: A/AAAA/CNAME/MX/NS, zone detection, PTR
   asn.py              IP → ASN/provider via Team Cymru DNS (no API key)
+  crtsh.py            subdomain enumeration via crt.sh CT logs (--crtsh)
   http_probe.py       per-host HTTP status + TLS validity
   dns_posture.py      SPF / DKIM / DMARC / CAA / wildcard
   scanner.py          nmap -sV wrapper + XML parse
