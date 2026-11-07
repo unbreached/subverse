@@ -110,9 +110,25 @@ def _vis_edges(g: Graph) -> list[dict]:
     return out
 
 
+def _embed(obj) -> str:
+    """Serialize to JSON that is safe to inline inside an HTML <script> element.
+
+    json.dumps does not escape <, >, & or the JS line separators U+2028/U+2029,
+    so a hostile target's Server header / PTR / AS-name / nmap banner could
+    otherwise smuggle a literal </script> into the page and break out of the
+    script element (stored XSS when the analyst opens the report). These \\uXXXX
+    escapes decode to the same characters inside the JS string, so the embedded
+    graph data is byte-for-byte equivalent once parsed.
+    """
+    return (json.dumps(obj)
+            .replace("<", "\\u003c").replace(">", "\\u003e")
+            .replace("&", "\\u0026")
+            .replace("\u2028", "\\u2028").replace("\u2029", "\\u2029"))
+
+
 def render_html(g: Graph, meta: dict) -> str:
-    nodes_json = json.dumps(_vis_nodes(g))
-    edges_json = json.dumps(_vis_edges(g))
+    nodes_json = _embed(_vis_nodes(g))
+    edges_json = _embed(_vis_edges(g))
 
     # counts for the header
     n_hosts = sum(1 for n in g.nodes if n.kind == "host")
